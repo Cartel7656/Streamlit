@@ -5,7 +5,7 @@ from sklearn.linear_model import LinearRegression
 import pickle
 
 # --- Load data ---
-df = pd.read_csv("beer-servings.csv")
+df = pd.read_csv("beer-app/beer-servings.csv")
 
 # --- Features and target ---
 X = df[["beer_servings", "wine_servings", "spirit_servings"]]
