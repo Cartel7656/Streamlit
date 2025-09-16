@@ -1,69 +1,51 @@
-import pandas as pd
-import pickle
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LinearRegression
-import streamlit as st
 import os
+import pandas as pd
+import streamlit as st
+import joblib
+from sklearn.linear_model import LinearRegression
 
-# ========== TRAIN THE MODEL IF NOT ALREADY SAVED ==========
-MODEL_FILE = "beer_servings_model.pkl"
+# Get the folder where this script (app.py) is located
+BASE_DIR = os.path.dirname(__file__)
 
+# File paths
+CSV_FILE = os.path.join(BASE_DIR, "beer-servings.csv")
+MODEL_FILE = os.path.join(BASE_DIR, "beer_servings_model.pkl")
+
+st.title("🍺 Beer Servings Predictor")
+
+# Check if model already exists
 if not os.path.exists(MODEL_FILE):
     st.write("🔄 Training model for the first time...")
-    # Load your data
-    df = pd.read_csv("beer-servings.csv")
 
-    # Features & target
+    # Load data
+    df = pd.read_csv(CSV_FILE)
+
+    # Features and target
     X = df[["beer_servings", "wine_servings", "spirit_servings"]]
-    y = df["total_litres_of_pure_alcohol"]
+    y = df["total_litres_of_pure_alcohol"] if "total_litres_of_pure_alcohol" in df.columns else df["beer_servings"]
 
-    # Drop rows with missing y
-    mask = y.notna()
-    X = X[mask]
-    y = y[mask]
-
-    # Pipeline: impute missing X + model
-    pipeline = Pipeline([
-        ("imputer", SimpleImputer(strategy="mean")),
-        ("model", LinearRegression())
-    ])
-
-    pipeline.fit(X, y)
+    # Train model
+    model = LinearRegression()
+    model.fit(X, y)
 
     # Save model
-    with open(MODEL_FILE, "wb") as f:
-        pickle.dump(pipeline, f)
+    joblib.dump(model, MODEL_FILE)
+    st.success("✅ Model trained and saved!")
+else:
+    st.write("✅ Loading existing model...")
+    model = joblib.load(MODEL_FILE)
 
-    st.write("✅ Model trained and saved to beer_servings_model.pkl")
+# Sidebar input
+st.sidebar.header("Input your servings")
+beer = st.sidebar.number_input("Beer servings", min_value=0, value=50)
+wine = st.sidebar.number_input("Wine servings", min_value=0, value=20)
+spirit = st.sidebar.number_input("Spirit servings", min_value=0, value=10)
 
-# ========== LOAD TRAINED MODEL ==========
-with open(MODEL_FILE, "rb") as f:
-    model = pickle.load(f)
+# Predict
+input_df = pd.DataFrame({"beer_servings": [beer],
+                         "wine_servings": [wine],
+                         "spirit_servings": [spirit]})
 
-# ========== STREAMLIT UI ==========
-st.title("🍺 Total Alcohol Servings Prediction App")
-st.image(
-    "https://i.pinimg.com/1200x/f9/39/24/f93924205fa02e3af33607d2057e3417.jpg",
-    caption="Welcome to the Beer Servings App",
-    use_container_width=True
-)
+prediction = model.predict(input_df)[0]
 
-st.write("### Enter details to predict the total alcohol servings (Beer + Wine + Spirit)")
-
-# User inputs
-wine_servings = st.number_input("Wine Servings (litres)", min_value=0, max_value=500, value=50)
-spirit_servings = st.number_input("Spirit Servings (litres)", min_value=0, max_value=500, value=100)
-beer_servings = st.number_input("Beer Servings (litres)", min_value=0, max_value=500, value=200)
-
-# Prepare input for prediction — only the columns the model was trained on
-input_data = pd.DataFrame([{
-    "beer_servings": beer_servings,
-    "wine_servings": wine_servings,
-    "spirit_servings": spirit_servings
-}])
-
-# Prediction button
-if st.button("Predict Total Alcohol Consumption"):
-    prediction = model.predict(input_data)
-    st.success(f"Estimated Total Litres of Pure Alcohol: {prediction[0]:.2f}")
+st.write(f"🍹 Predicted alcohol consumption: **{prediction:.2f} litres**")

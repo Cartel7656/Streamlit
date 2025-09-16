@@ -1,32 +1,33 @@
+import os
 import pandas as pd
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
+import joblib
 from sklearn.linear_model import LinearRegression
-import pickle
 
-# --- Load data ---
-df = pd.read_csv("beer-app/beer-servings.csv")
+BASE_DIR = os.path.dirname(__file__)
+CSV_FILE = os.path.join(BASE_DIR, "beer-servings.csv")
+MODEL_FILE = os.path.join(BASE_DIR, "beer_servings_model.pkl")
 
-# --- Features and target ---
-X = df[["beer_servings", "wine_servings", "spirit_servings"]]
-y = df["total_litres_of_pure_alcohol"]
+def train_model():
+    if not os.path.exists(CSV_FILE):
+        print(f"Error: CSV file not found at {CSV_FILE}")
+        return
 
-# --- Drop rows where y is NaN ---
-mask = y.notna()
-X = X[mask]
-y = y[mask]
+    # Load data
+    df = pd.read_csv(CSV_FILE)
 
-# --- Build pipeline: impute missing values + model ---
-pipeline = Pipeline([
-    ("imputer", SimpleImputer(strategy="mean")),  # fills NaNs in X with column mean
-    ("model", LinearRegression())
-])
+    # Drop rows with missing values in features
+    df = df.dropna(subset=["beer_servings", "wine_servings", "spirit_servings"])
 
-# --- Train model ---
-pipeline.fit(X, y)
+    X = df[["beer_servings", "wine_servings", "spirit_servings"]]
+    y = df["total_litres_of_pure_alcohol"] if "total_litres_of_pure_alcohol" in df.columns else df["beer_servings"]
 
-# --- Save the trained pipeline ---
-with open("beer_servings_model.pkl", "wb") as f:
-    pickle.dump(pipeline, f)
+    # Train model
+    model = LinearRegression()
+    model.fit(X, y)
 
-print("✅ Model trained and saved to beer_servings_model.pkl")
+    # Save model
+    joblib.dump(model, MODEL_FILE)
+    print(f"Model trained and saved to {MODEL_FILE}")
+
+if __name__ == "__main__":
+    train_model()
